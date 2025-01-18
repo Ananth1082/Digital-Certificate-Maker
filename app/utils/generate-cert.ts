@@ -99,23 +99,15 @@ const template = `
 `;
 
 export async function generateCertificate(
-  participantName: string,
-  college: string,
-  eventName: string
+  fields: string[],
+  certificateDetails: Record<string, string>
 ): Promise<string | Buffer> {
   try {
     let html = template;
 
-    // Replace {{name}} with participant name
-    if (college == "OTHER") {
-      html = html.replace("{{college}}", " ").replace("<span> OF</span>", "");
-    }
-    html = html
-      .replace("{{name}}", participantName)
-      .replace("{{college}}", college)
-      .replace("{{event}}", eventName);
-
-    // Generate image from HTML
+    fields.forEach((field) => {
+      html = html.replace(`{{${field}}}`, certificateDetails[field]);
+    });
 
     const imageBuffer = await htmlToImage({
       html,
@@ -132,9 +124,3 @@ export async function generateCertificate(
     throw new Error("Error generating certificate");
   }
 }
-
-// generateCertificate("John Doe", "NITTE", "Hackathon").then((imageBuffer) => {
-//   fs.writeFile("certificate.png", imageBuffer, (err) => {
-//     console.error(err);
-//   });
-// });
