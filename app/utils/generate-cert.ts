@@ -100,10 +100,11 @@ const template = `
 
 export async function generateCertificate(
   fields: string[],
-  certificateDetails: Record<string, string>
+  certificateDetails: Record<string, string>,
+  format: string
 ): Promise<string | Buffer> {
   try {
-    let html = template;
+    let html = format;
 
     fields.forEach((field) => {
       html = html.replace(`{{${field}}}`, certificateDetails[field]);

@@ -15,14 +15,15 @@ app.get("/ping", (_, res) => {
 });
 
 app.post("/generate-certificate", async (req, res) => {
-  const { participantName, college, eventName } = req.body;
+  const { cert_id, details } = req.body;
   try {
-    const imgBuf = await generateCertificate(["name", "college", "event"], {
-      name: participantName,
-      college,
-      event: eventName,
+    const cert = await db.certificate.findUniqueOrThrow({
+      where: {
+        id: cert_id,
+      },
     });
-    res.status(200).send(imgBuf);
+    const imgBuf = await generateCertificate(cert.fields, details, cert.format);
+    res.status(200).set("Content-Type", "image/png").send(imgBuf);
   } catch (error) {
     res.status(500).send("Error generating certificate");
   }
@@ -36,13 +37,18 @@ app.post("/create-format", upload.single("html_file"), async (req, res) => {
       return;
     }
     const data = req.file ? req.file.buffer.toString() : format;
-    await db.certificate.create({
+    const cert = await db.certificate.create({
       data: {
         format: data,
         fields: fields.split(","),
       },
+      select: {
+        id: true,
+      },
     });
-    res.status(200).send("Format created successfully");
+    res
+      .status(200)
+      .send({ msg: "Format created successfully", cert_id: cert.id });
   } catch (error) {
     res.status(500).send("Error generating certificate");
   }
