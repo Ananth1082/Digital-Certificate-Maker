@@ -23,6 +23,8 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { generateEmail } from "@/util/email";
 
 interface Participant {
   id: string;
@@ -32,6 +34,7 @@ interface Participant {
 }
 
 // Sample data - replace with your actual data
+// fetch event user details
 const sampleData: Participant[] = [
   { id: "001", name: "John Doe", teamName: "Team Alpha", emailSent: true },
   { id: "002", name: "Jane Smith", teamName: "Team Beta", emailSent: false },
@@ -60,7 +63,7 @@ const events = [
 
 export default function EventTracker() {
   const [selectedEvent, setSelectedEvent] = useState<string>("");
-
+  generateEmail();
   const selectedEventDetails = events.find(
     (event) => event.id === selectedEvent
   );
@@ -68,35 +71,47 @@ export default function EventTracker() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto p-4">
       {/* Event Selection Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Select Event</CardTitle>
-          <CardDescription>
-            Choose an event to view its participants and tracking details
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Select onValueChange={setSelectedEvent} value={selectedEvent}>
-            <SelectTrigger className="w-[300px]">
-              <SelectValue placeholder="Select Event" />
-            </SelectTrigger>
-            <SelectContent>
-              {events.map((event) => (
-                <SelectItem key={event.id} value={event.id}>
-                  {event.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="flex gap-4">
+        <Card className="mt-20">
+          <CardHeader>
+            <CardTitle>Select Event</CardTitle>
+            <CardDescription>
+              Choose an event to view its participants and tracking details
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Select onValueChange={setSelectedEvent} value={selectedEvent}>
+              <SelectTrigger className="w-[300px]">
+                <SelectValue placeholder="Select Event" />
+              </SelectTrigger>
+              <SelectContent>
+                {events.map((event) => (
+                  <SelectItem key={event.id} value={event.id}>
+                    {event.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          {selectedEventDetails && (
-            <p className="mt-4 text-sm text-muted-foreground">
-              {selectedEventDetails.description}
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
+            {selectedEventDetails && (
+              <p className="mt-4 text-sm text-muted-foreground">
+                {selectedEventDetails.description}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+        <Card className="mt-20">
+          <CardHeader>
+            <CardTitle>Issue Certificates</CardTitle>
+            <CardDescription>
+              Issue certificates for the people who attended the event
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button> Issue</Button>
+          </CardContent>
+        </Card>
+      </div>
       {/* Participants Table Card */}
       <Card>
         <CardHeader>
