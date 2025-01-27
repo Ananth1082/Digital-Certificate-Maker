@@ -5,9 +5,9 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Toast } from "@/components/ui/toast";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
+import Image from "next/image";
 
 export default function CertificateGenerator() {
   const [formData, setFormData] = useState({
@@ -142,7 +142,7 @@ export default function CertificateGenerator() {
         {/* Preview Section */}
         <div className="relative bg-white rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center min-h-[400px]">
           {img ? (
-            <img src={img} />
+            <Image src={img} alt="certificate" />
           ) : (
             <div className="text-gray-500">Certificate Preview</div>
           )}

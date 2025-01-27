@@ -1,4 +1,4 @@
-import { generateCertificateEmail, generateEmail } from "@/util/email";
+import { generateCertificateEmail } from "@/util/email";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
