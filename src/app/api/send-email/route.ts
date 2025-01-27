@@ -3,10 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
-    // Parse the JSON body
     const { to, details, cid } = await req.json();
 
-    // Validate required fields
     if (!to) {
       return NextResponse.json(
         { error: "Missing required fields" },
@@ -14,7 +12,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(to)) {
       return NextResponse.json(
@@ -24,12 +21,14 @@ export async function POST(req: NextRequest) {
     }
     const headers = new Headers();
     headers.set("Content-Type", "image/jpeg");
-    // Send email
     const info = await generateCertificateEmail(details, to);
     if (cid) {
-      await fetch(`http://localhost:4000/certificate/mark-as-sent/${cid}`, {
-        method: "PUT",
-      });
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/certificate/mark-as-sent/${cid}`,
+        {
+          method: "PUT",
+        }
+      );
     }
     return new NextResponse(info, { status: 200, headers });
   } catch (error) {
@@ -41,7 +40,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Optionally configure allowed methods
 export const config = {
   api: {
     bodyParser: true,

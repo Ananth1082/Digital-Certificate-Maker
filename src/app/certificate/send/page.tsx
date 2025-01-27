@@ -45,9 +45,12 @@ export default function EventTracker() {
   const [selectedEvent, setSelectedEvent] = useState<string>("");
   const [events, setEvents] = useState<Event[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [issueLoading, setIssueLoading] = useState(false);
+  const [sendLoading, setSendLoading] = useState(false);
   const { toast } = useToast();
+
   useEffect(() => {
-    fetch("http://localhost:4000/events")
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/events`)
       .then((res) => res.json())
       .then((data) => {
         setEvents(data.events);
@@ -57,6 +60,7 @@ export default function EventTracker() {
   }, []);
 
   const issueCertificates = () => {
+    if (issueLoading) return;
     if (!selectedEvent) {
       toast({
         title: "Error",
@@ -65,7 +69,8 @@ export default function EventTracker() {
       });
       return;
     }
-    fetch(`http://localhost:4000/certificates/${selectedEvent}`, {
+    setIssueLoading(true);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/certificates/${selectedEvent}`, {
       method: "POST",
     })
       .then((res) => {
@@ -80,6 +85,7 @@ export default function EventTracker() {
             title: "Success",
             description: "Issued the certificates",
           });
+          fetchParticipantsAndSet(selectedEvent);
         }
         return res.json();
       })
@@ -92,12 +98,17 @@ export default function EventTracker() {
         }
         setParticipants(data.participants);
       })
-      .catch((error) => console.error("Error issuing certificates:", error));
+      .catch((error) => console.error("Error issuing certificates:", error))
+      .finally(() => setIssueLoading(false));
   };
 
   const changeSelection = (val: string) => {
     setSelectedEvent(val);
-    fetch(`http://localhost:4000/event/${val}/participants`)
+    fetchParticipantsAndSet(val);
+  };
+
+  const fetchParticipantsAndSet = (eid: string) => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/event/${eid}/participants`)
       .then((res) => {
         if (!res.ok) {
           toast({
@@ -134,12 +145,15 @@ export default function EventTracker() {
     (event) => `${event.id}` === selectedEvent
   );
 
-  const sendEmail = async (details: {
-    name: string;
-    email: string;
-    college: string;
-    event: string;
-  }) => {
+  const sendEmail = async (
+    details: {
+      name: string;
+      email: string;
+      college: string;
+      event: string;
+    },
+    cid: string
+  ) => {
     if (!details.email || !details.name || !details.college || !details.event) {
       toast({
         title: "Error",
@@ -157,6 +171,7 @@ export default function EventTracker() {
           college: details.college,
           event: details.event,
         },
+        cid,
       }),
     })
       .then((res) => {
@@ -179,7 +194,8 @@ export default function EventTracker() {
         });
       });
   };
-  const sendCertificateEmails = () => {
+  const sendCertificateEmails = async () => {
+    if (sendLoading) return;
     if (participants.length === 0) {
       toast({
         title: "Error",
@@ -196,15 +212,24 @@ export default function EventTracker() {
       });
       return;
     }
-    participants.forEach((participant) => {
-      if (participant.issued) return;
-      sendEmail({
-        name: participant.name,
-        email: `${participant.email}`,
-        college: participant.college,
-        event: selectedEventDetails?.name,
-      });
-    });
+    setSendLoading(true);
+    const prms = participants
+      .map((participant) => {
+        if (participant.issued) return;
+        return sendEmail(
+          {
+            name: participant.name,
+            email: `${participant.email}`,
+            college: participant.college,
+            event: selectedEventDetails?.name,
+          },
+          participant.cid
+        );
+      })
+      .filter((prm) => prm !== undefined);
+
+    await Promise.all(prms);
+    setSendLoading(false);
   };
 
   return (
@@ -242,7 +267,14 @@ export default function EventTracker() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={issueCertificates}> Issue</Button>
+            <Button
+              className={`w-full ${
+                issueLoading ? "bg-gray-500 hover:bg-gray-500" : "bg-black"
+              }`}
+              onClick={issueCertificates}
+            >
+              {issueLoading ? "Issuing..." : "Issue"}
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -255,7 +287,14 @@ export default function EventTracker() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button onClick={sendCertificateEmails}>Send</Button>
+          <Button
+            className={` ${
+              sendLoading ? "bg-gray-500 hover:bg-gray-500" : "bg-black"
+            }`}
+            onClick={sendCertificateEmails}
+          >
+            {sendLoading ? "Sending..." : "Send"}
+          </Button>
         </CardContent>
       </Card>
       {/* Participants Table Card */}
