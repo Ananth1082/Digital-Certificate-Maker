@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Table,
   TableBody,
@@ -24,54 +24,194 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { generateEmail } from "@/util/email";
+import { Toaster } from "@/components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
 
 interface Participant {
+  cid: string;
   id: string;
   name: string;
-  teamName: string;
-  emailSent: boolean;
+  issued: boolean;
+  email: string;
+  college: string;
 }
 
-// Sample data - replace with your actual data
-// fetch event user details
-const sampleData: Participant[] = [
-  { id: "001", name: "John Doe", teamName: "Team Alpha", emailSent: true },
-  { id: "002", name: "Jane Smith", teamName: "Team Beta", emailSent: false },
-  { id: "003", name: "Alex Johnson", teamName: "Team Gamma", emailSent: true },
-];
-
-const events = [
-  {
-    id: "1",
-    name: "Hackathon 2024",
-    description:
-      "Annual coding competition featuring teams from various colleges",
-  },
-  {
-    id: "2",
-    name: "Tech Conference",
-    description:
-      "Industry-leading speakers sharing insights on latest technologies",
-  },
-  {
-    id: "3",
-    name: "Workshop",
-    description: "Hands-on learning session for emerging technologies",
-  },
-];
+type Event = {
+  id: number;
+  name: string;
+};
 
 export default function EventTracker() {
   const [selectedEvent, setSelectedEvent] = useState<string>("");
-  generateEmail();
+  const [events, setEvents] = useState<Event[]>([]);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const { toast } = useToast();
+  useEffect(() => {
+    fetch("http://localhost:4000/events")
+      .then((res) => res.json())
+      .then((data) => {
+        setEvents(data.events);
+        console.log(data);
+      })
+      .catch((error) => console.error("Error fetching events:", error));
+  }, []);
+
+  const issueCertificates = () => {
+    if (!selectedEvent) {
+      toast({
+        title: "Error",
+        description: "No event selected",
+        variant: "destructive",
+      });
+      return;
+    }
+    fetch(`http://localhost:4000/certificates/${selectedEvent}`, {
+      method: "POST",
+    })
+      .then((res) => {
+        if (!res.ok) {
+          toast({
+            title: "Error",
+            description: "Failed to issue certificates",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Success",
+            description: "Issued the certificates",
+          });
+        }
+        return res.json();
+      })
+      .then((data) => {
+        console.log(data);
+
+        if (!data.participants) {
+          setParticipants([]);
+          return;
+        }
+        setParticipants(data.participants);
+      })
+      .catch((error) => console.error("Error issuing certificates:", error));
+  };
+
+  const changeSelection = (val: string) => {
+    setSelectedEvent(val);
+    fetch(`http://localhost:4000/event/${val}/participants`)
+      .then((res) => {
+        if (!res.ok) {
+          toast({
+            title: "Error",
+            description: "Failed to fetch participants",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Success",
+            description: "Fetched the participants",
+          });
+        }
+        return res.json();
+      })
+      .then((data: { participants: Participant[] }) => {
+        if (!data.participants) {
+          setParticipants([]);
+          return;
+        }
+        setParticipants(data.participants);
+      })
+      .catch((error) => {
+        console.error("Error fetching participants for event:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch participants",
+          variant: "destructive",
+        });
+      });
+  };
+
   const selectedEventDetails = events.find(
-    (event) => event.id === selectedEvent
+    (event) => `${event.id}` === selectedEvent
   );
+
+  const sendEmail = async (details: {
+    name: string;
+    email: string;
+    college: string;
+    event: string;
+  }) => {
+    if (!details.email || !details.name || !details.college || !details.event) {
+      toast({
+        title: "Error",
+        description: "Please fill all fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    fetch("/api/send-email", {
+      method: "POST",
+      body: JSON.stringify({
+        to: details.email,
+        details: {
+          name: details.name,
+          college: details.college,
+          event: details.event,
+        },
+      }),
+    })
+      .then((res) => {
+        if (res.ok) {
+          setParticipants((prev) =>
+            prev.map((participant) =>
+              participant.email === details.email
+                ? { ...participant, issued: true }
+                : participant
+            )
+          );
+        }
+      })
+      .catch((error) => {
+        console.error("Error sending email:", error);
+        toast({
+          title: "Error",
+          description: `Failed to send email to ${details.email}`,
+          variant: "destructive",
+        });
+      });
+  };
+  const sendCertificateEmails = () => {
+    if (participants.length === 0) {
+      toast({
+        title: "Error",
+        description: "No participants to send certificates",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!selectedEventDetails) {
+      toast({
+        title: "Error",
+        description: "No event selected",
+        variant: "destructive",
+      });
+      return;
+    }
+    participants.forEach((participant) => {
+      if (participant.issued) return;
+      sendEmail({
+        name: participant.name,
+        email: `${participant.email}`,
+        college: participant.college,
+        event: selectedEventDetails?.name,
+      });
+    });
+  };
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto p-4">
       {/* Event Selection Card */}
       <div className="flex gap-4">
+        <Toaster />
         <Card className="mt-20">
           <CardHeader>
             <CardTitle>Select Event</CardTitle>
@@ -80,24 +220,18 @@ export default function EventTracker() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Select onValueChange={setSelectedEvent} value={selectedEvent}>
+            <Select onValueChange={changeSelection} value={selectedEvent}>
               <SelectTrigger className="w-[300px]">
                 <SelectValue placeholder="Select Event" />
               </SelectTrigger>
               <SelectContent>
                 {events.map((event) => (
-                  <SelectItem key={event.id} value={event.id}>
+                  <SelectItem key={event.id} value={`${event.id}`}>
                     {event.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-
-            {selectedEventDetails && (
-              <p className="mt-4 text-sm text-muted-foreground">
-                {selectedEventDetails.description}
-              </p>
-            )}
           </CardContent>
         </Card>
         <Card className="mt-20">
@@ -108,10 +242,22 @@ export default function EventTracker() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button> Issue</Button>
+            <Button onClick={issueCertificates}> Issue</Button>
           </CardContent>
         </Card>
       </div>
+      <Card className="mt-20">
+        <CardHeader>
+          <CardTitle>Send certificates</CardTitle>
+          <CardDescription>
+            Send participation certificates to the participant's email. This
+            process might take some time
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={sendCertificateEmails}>Send</Button>
+        </CardContent>
+      </Card>
       {/* Participants Table Card */}
       <Card>
         <CardHeader>
@@ -129,19 +275,21 @@ export default function EventTracker() {
                 <TableRow>
                   <TableHead className="w-[100px]">ID</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>Team Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>College</TableHead>
                   <TableHead className="w-[100px]">Email Sent</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sampleData.map((participant) => (
+                {participants.map((participant) => (
                   <TableRow key={participant.id}>
                     <TableCell className="font-medium">
                       {participant.id}
                     </TableCell>
                     <TableCell>{participant.name}</TableCell>
-                    <TableCell>{participant.teamName}</TableCell>
-                    <TableCell>{participant.emailSent ? "✓" : ""}</TableCell>
+                    <TableCell>{participant.email}</TableCell>
+                    <TableCell>{participant.college}</TableCell>
+                    <TableCell>{participant.issued ? "✔" : "❌"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
